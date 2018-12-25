@@ -4,10 +4,11 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using System.Net.Http;
+using System.Web;
 
 namespace Bonkers
 {
-	public class APIEndpoint
+	public class ApiEndpoint
 	{
 		public delegate T ResponseProcessMethod<T>(HttpRequestMessage request, HttpResponseMessage response);
 
@@ -21,9 +22,10 @@ namespace Bonkers
 		private Dictionary<string, string> _requestContentHeaders;
 		private HttpContent _requestContent;
 
-		internal APIEndpoint()
+		internal ApiEndpoint(HttpClient client, Uri url)
 		{
-			_client = new HttpClient();
+			FullUrl = url;
+			_client = client;
 			_requestContentHeaders = new Dictionary<string, string>();
 			_requestHeaders = new Dictionary<string, string>();
 		}
@@ -33,25 +35,24 @@ namespace Bonkers
 		/// </summary>
 		/// <param name="url">Endpoint URL</param>
 		/// <returns></returns>
-		public APIEndpoint Combine(params string[] url)
+		public ApiEndpoint Combine(params string[] url)
 		{
-			var endpoint = new APIEndpoint();
-			endpoint.FullUrl = endpoint.FullUrl.Combine(url);
-
-			return endpoint;
+			return new ApiEndpoint(_client, FullUrl.Combine(url));
 		}
 
 		/// <summary>
 		/// Duplicate the endpoint
 		/// </summary>
 		/// <returns></returns>
-		public APIEndpoint Duplicate()
+		public ApiEndpoint Duplicate()
 		{
-			return new APIEndpoint
+			return new ApiEndpoint(_client, FullUrl)
 			{
-				FullUrl = FullUrl,
 				_client = _client,
-				_request = _request
+				_request = _request,
+				_requestContent = _requestContent,
+				_requestContentHeaders = _requestContentHeaders,
+				_requestHeaders = _requestHeaders
 			};
 		}
 
@@ -59,7 +60,7 @@ namespace Bonkers
 		/// Set the default parameters on the endpoint
 		/// </summary>
 		/// <returns></returns>
-		public APIEndpoint Reset()
+		public ApiEndpoint Reset()
 		{
 			_request = null;
 			_requestContentHeaders.Clear();
@@ -69,10 +70,10 @@ namespace Bonkers
 		/// <summary>
 		/// Set a header value
 		/// </summary>
-		/// <param name="name"></param>
-		/// <param name="value"></param>
+		/// <param name="name">Name of header</param>
+		/// <param name="value">Value of header</param>
 		/// <returns></returns>
-		public APIEndpoint Header(string name, string value)
+		public ApiEndpoint Header(string name, string value)
 		{
 			if (name.Equals("Content-Type") ||
 				name.Equals("Content-Language") ||
@@ -101,7 +102,7 @@ namespace Bonkers
 		/// <param name="body">Content</param>
 		/// <param name="encoding">Content encoding</param>
 		/// <returns></returns>
-		public APIEndpoint Body(string body, Encoding encoding = null)
+		public ApiEndpoint Body(string body, Encoding encoding = null)
 		{
 			_request.Content = new StringContent(body, encoding ?? Encoding.UTF8);
 			return this;
@@ -113,7 +114,7 @@ namespace Bonkers
 		/// <param name="stream">Input stream</param>
 		/// <param name="bufferSize">Buffer size</param>
 		/// <returns></returns>
-		public APIEndpoint Stream(Stream stream, int bufferSize = 0)
+		public ApiEndpoint Stream(Stream stream, int bufferSize = 0)
 		{
 			if (bufferSize == 0 || bufferSize < 0)
 				_request.Content = new StreamContent(stream);
@@ -122,6 +123,28 @@ namespace Bonkers
 
 			return this;
 		}
+
+		/// <summary>
+		/// Add parameters to query string
+		/// </summary>
+		/// <param name="name">Name of parameter</param>
+		/// <param name="value">Value of parameter</param>
+		/// <returns></returns>
+		public ApiEndpoint Params(QueryString @params)
+		{
+			string url = "?";
+
+			foreach(var param in @params)
+				url += $"{param.Key}={param.Value}&";
+
+			url = url.Remove(url.Length - 1, 1);
+
+			FullUrl = new Uri(FullUrl.ToString() + url);
+
+			return this;
+		}
+
+		#region HTTP Methods
 
 		/// <summary>
 		/// Basic GET request
@@ -158,6 +181,8 @@ namespace Bonkers
 			CreateRequest(HttpMethod.Post);
 			SetContentHeaders();
 
+			System.Diagnostics.Debug.WriteLine(FullUrl);
+
 			return await (await _client.SendAsync(_request)).Content.ReadAsStringAsync();
 		}
 
@@ -174,6 +199,8 @@ namespace Bonkers
 			var response = await _client.SendAsync(_request);
 			return process(_request, response);
 		}
+
+		#endregion HTTP Methods
 
 		#region Helpers
 

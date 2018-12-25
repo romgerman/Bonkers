@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -13,17 +14,28 @@ namespace Bonkers
 		 var userData = getUser.Get<HitboxUser>();
 	 */
 
-	public class APIClient
+	public class ApiClient
     {
 		private Uri _url;
+		private HttpClient _client;
 	
 		/// <summary>
 		/// Create a new instance of APIClient
 		/// </summary>
 		/// <param name="api">Base API URL</param>
-		public APIClient(Uri api)
+		public ApiClient(string url) : this(new Uri(url))
 		{
-			_url = api;
+
+		}
+
+		/// <summary>
+		/// Create a new instance of APIClient
+		/// </summary>
+		/// <param name="api">Base API URL</param>
+		public ApiClient(Uri url)
+		{
+			_url = url;
+			_client = new HttpClient();
 		}
 
 		/// <summary>
@@ -31,12 +43,9 @@ namespace Bonkers
 		/// </summary>
 		/// <param name="url">Endpoint URL</param>
 		/// <returns></returns>
-		public APIEndpoint CreateEndpoint(string url)
+		public ApiEndpoint CreateEndpoint(string url)
 		{
-			var endpoint = new APIEndpoint();
-			endpoint.FullUrl = new Uri(_url.ToString() + url);
-
-			return endpoint;
+			return new ApiEndpoint(_client, _url.Combine(url));
 		}
     }
 }

@@ -10,12 +10,7 @@ namespace Bonkers
 	{
 		public static Uri Combine(this Uri uri, params string[] args)
 		{
-			Uri result = uri;
-
-			foreach(var arg in args)
-				result = new Uri(result, arg);
-
-			return result;
+			return new Uri(uri.ToString() + string.Join(string.Empty, args));
 		}
 	}
 }
